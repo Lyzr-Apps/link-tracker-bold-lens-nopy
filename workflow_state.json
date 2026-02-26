@@ -1,0 +1,24 @@
+{
+  "agents": [
+    {
+      "agent_id": "699feec843916312e1f04811",
+      "name": "Video Metrics Analyzer",
+      "description": "Social media video performance analyst that fetches real-time public engagement metrics (views, likes, comments, shares, engagement rate, reach, impressions) for video links from Twitter/X, Instagram, and TikTok using web search.",
+      "model": "perplexity/sonar-pro",
+      "provider_id": "perplexity",
+      "temperature": 0.2,
+      "top_p": 0.9,
+      "agent_type": "json",
+      "capabilities": {
+        "image_output": false,
+        "voice": false,
+        "file_output": false,
+        "web_search": true
+      },
+      "response_schema_file": "response_schemas/video_metrics_analyzer_response.json"
+    }
+  ],
+  "rag_ids": [],
+  "schedules": [],
+  "workflow_file": "workflow.json"
+}

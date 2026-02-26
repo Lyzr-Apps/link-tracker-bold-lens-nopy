@@ -1,0 +1,40 @@
+{
+  "name": "Influencer Campaign Video Tracker",
+  "description": "A persistent dashboard for tracking video performance across Twitter, Instagram, and TikTok influencer campaigns. Users paste video links to instantly fetch engagement rate, reach, and impressions using Perplexity sonar-pro for real-time web search.",
+  "pattern": "single_agent",
+  "nodes": [
+    {
+      "id": "input_node",
+      "type": "Input",
+      "label": "Video Link Input",
+      "nodeCategory": "input"
+    },
+    {
+      "id": "video_metrics_agent",
+      "type": "Agent",
+      "label": "Video Metrics Analyzer",
+      "nodeCategory": "agent",
+      "agent_id": "699feec843916312e1f04811",
+      "model": "perplexity/sonar-pro",
+      "provider_id": "perplexity",
+      "temperature": 0.2,
+      "top_p": 0.9
+    },
+    {
+      "id": "output_node",
+      "type": "Output",
+      "label": "Metrics Dashboard",
+      "nodeCategory": "end"
+    }
+  ],
+  "edges": [
+    {
+      "source": "input_node",
+      "target": "video_metrics_agent"
+    },
+    {
+      "source": "video_metrics_agent",
+      "target": "output_node"
+    }
+  ]
+}

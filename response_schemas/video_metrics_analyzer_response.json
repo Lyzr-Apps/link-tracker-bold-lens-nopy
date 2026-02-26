@@ -1,0 +1,40 @@
+{
+  "agent_name": "Video Metrics Analyzer",
+  "agent_id": "699feec843916312e1f04811",
+  "description": "Social media video performance analyst that fetches real-time public engagement metrics (views, likes, comments, shares, engagement rate, reach, impressions) for video links from Twitter/X, Instagram, and TikTok using web search.",
+  "agent_type": "json",
+  "accessor": "result",
+  "auto_generated": true,
+  "response_schema": {
+    "platform": "string",
+    "influencer_name": "string",
+    "influencer_handle": "string",
+    "video_title": "string",
+    "video_url": "string",
+    "views": "number",
+    "likes": "number",
+    "comments": "number",
+    "shares": "number",
+    "engagement_rate": "number",
+    "estimated_reach": "number",
+    "estimated_impressions": "number",
+    "is_estimated": "boolean",
+    "analysis_summary": "string"
+  },
+  "example_response": {
+    "platform": "The social media platform (Twitter, Instagram, or TikTok)",
+    "influencer_name": "The name of the influencer/creator",
+    "influencer_handle": "The social media handle of the influencer",
+    "video_title": "Title or description snippet of the video",
+    "video_url": "The original video URL provided",
+    "views": 0,
+    "likes": 0,
+    "comments": 0,
+    "shares": 0,
+    "engagement_rate": 0,
+    "estimated_reach": 0,
+    "estimated_impressions": 0,
+    "is_estimated": false,
+    "analysis_summary": "Brief summary of the video performance analysis"
+  }
+}
