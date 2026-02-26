@@ -1226,41 +1226,121 @@ export default function Page() {
 
     try {
       const result = await callAIAgent(
-        `Analyze this video URL and return engagement metrics: ${videoUrl.trim()}`,
+        `Analyze this social media video and return ALL engagement metrics as numbers. Search multiple sources including analytics sites, social trackers, and creator profiles. If exact data is unavailable, provide best estimates based on the creator's follower count and platform benchmarks. NEVER return zeros for all fields. URL: ${videoUrl.trim()}`,
         AGENT_ID
       )
 
       if (result.success) {
-        let data = result?.response?.result
+        // Deep extraction: try multiple paths to find the actual metrics data
+        let data: any = null
 
-        // Handle nested responses
-        if (data && typeof data === 'object') {
-          if (!data.platform && data.result) {
-            data = data.result
+        const tryParse = (val: any): any => {
+          if (typeof val === 'string') {
+            try { return JSON.parse(val) } catch { return null }
           }
-          if (!data.platform && data.response) {
-            data = typeof data.response === 'string' ? JSON.parse(data.response) : data.response
-            if (data?.result) data = data.result
+          return val
+        }
+
+        const hasPlatformField = (obj: any): boolean => {
+          return obj && typeof obj === 'object' && !Array.isArray(obj) && (
+            'platform' in obj || 'influencer_name' in obj || 'views' in obj
+          )
+        }
+
+        // Path 1: result.response.result (standard)
+        const r1 = result?.response?.result
+        if (hasPlatformField(r1)) {
+          data = r1
+        }
+
+        // Path 2: result.response.result.result (double nested)
+        if (!data && r1 && typeof r1 === 'object') {
+          const r2 = tryParse(r1.result) || r1.result
+          if (hasPlatformField(r2)) data = r2
+        }
+
+        // Path 3: result.response.result.response (response wrapper)
+        if (!data && r1 && typeof r1 === 'object') {
+          const r3 = tryParse(r1.response) || r1.response
+          if (hasPlatformField(r3)) data = r3
+          if (!data && r3 && typeof r3 === 'object') {
+            const r4 = tryParse(r3.result) || r3.result
+            if (hasPlatformField(r4)) data = r4
           }
         }
 
-        if (data && data.platform) {
+        // Path 4: result.response.result.data
+        if (!data && r1 && typeof r1 === 'object') {
+          const r5 = tryParse(r1.data) || r1.data
+          if (hasPlatformField(r5)) data = r5
+        }
+
+        // Path 5: result.response itself contains the fields (flat response)
+        if (!data && hasPlatformField(result?.response)) {
+          data = result.response
+        }
+
+        // Path 6: raw_response string parsing
+        if (!data && result?.raw_response) {
+          const raw = tryParse(result.raw_response)
+          if (hasPlatformField(raw)) data = raw
+          if (!data && raw?.result && hasPlatformField(raw.result)) data = raw.result
+        }
+
+        // Path 7: Scan all keys of result.response.result for any nested object with platform
+        if (!data && r1 && typeof r1 === 'object') {
+          for (const key of Object.keys(r1)) {
+            const val = tryParse(r1[key]) || r1[key]
+            if (hasPlatformField(val)) { data = val; break }
+          }
+        }
+
+        // Helper: safely parse a numeric value that might be string like "1.2M" or "45K"
+        const safeNumber = (val: any): number => {
+          if (typeof val === 'number' && !isNaN(val)) return val
+          if (typeof val === 'string') {
+            const cleaned = val.replace(/[,$\s]/g, '')
+            if (/[\d.]+[mM]$/i.test(cleaned)) return parseFloat(cleaned) * 1_000_000
+            if (/[\d.]+[kK]$/i.test(cleaned)) return parseFloat(cleaned) * 1_000
+            if (/[\d.]+[bB]$/i.test(cleaned)) return parseFloat(cleaned) * 1_000_000_000
+            const n = parseFloat(cleaned)
+            if (!isNaN(n)) return n
+          }
+          return 0
+        }
+
+        // Detect platform from URL if agent didn't identify it
+        const detectPlatform = (url: string): string => {
+          const u = url.toLowerCase()
+          if (u.includes('twitter.com') || u.includes('x.com')) return 'Twitter'
+          if (u.includes('instagram.com')) return 'Instagram'
+          if (u.includes('tiktok.com')) return 'TikTok'
+          return 'Unknown'
+        }
+
+        // Extract handle from URL if not provided
+        const extractHandle = (url: string): string => {
+          const match = url.match(/(?:instagram\.com|tiktok\.com|twitter\.com|x\.com)\/@?([^/?#]+)/)
+          return match ? '@' + match[1] : ''
+        }
+
+        if (data) {
           const newEntry: VideoMetrics = {
             id: generateId(),
-            platform: data.platform || 'Unknown',
-            influencer_name: data.influencer_name || 'Unknown',
-            influencer_handle: data.influencer_handle || '',
-            video_title: data.video_title || '',
-            video_url: data.video_url || videoUrl.trim(),
-            views: Number(data.views) || 0,
-            likes: Number(data.likes) || 0,
-            comments: Number(data.comments) || 0,
-            shares: Number(data.shares) || 0,
-            engagement_rate: Number(data.engagement_rate) || 0,
-            estimated_reach: Number(data.estimated_reach) || 0,
-            estimated_impressions: Number(data.estimated_impressions) || 0,
-            is_estimated: Boolean(data.is_estimated),
-            analysis_summary: data.analysis_summary || '',
+            platform: String(data.platform || detectPlatform(videoUrl.trim())),
+            influencer_name: String(data.influencer_name || data.creator_name || data.name || 'Unknown'),
+            influencer_handle: String(data.influencer_handle || data.handle || data.username || extractHandle(videoUrl.trim())),
+            video_title: String(data.video_title || data.title || data.description || ''),
+            video_url: String(data.video_url || videoUrl.trim()),
+            views: safeNumber(data.views ?? data.view_count ?? data.viewCount),
+            likes: safeNumber(data.likes ?? data.like_count ?? data.likeCount),
+            comments: safeNumber(data.comments ?? data.comment_count ?? data.commentCount),
+            shares: safeNumber(data.shares ?? data.share_count ?? data.shareCount ?? data.retweets ?? data.reposts),
+            engagement_rate: safeNumber(data.engagement_rate ?? data.engagementRate ?? data.engagement),
+            estimated_reach: safeNumber(data.estimated_reach ?? data.reach ?? data.estimatedReach),
+            estimated_impressions: safeNumber(data.estimated_impressions ?? data.impressions ?? data.estimatedImpressions),
+            is_estimated: data.is_estimated === true || data.is_estimated === 'true' || data.isEstimated === true,
+            analysis_summary: String(data.analysis_summary || data.summary || data.analysis || ''),
             campaign: campaign.trim(),
             dateAdded: new Date().toISOString(),
           }
@@ -1268,7 +1348,11 @@ export default function Page() {
           setVideos(prev => [newEntry, ...prev])
           setVideoUrl('')
         } else {
-          setError('Unable to parse response. The agent did not return expected metrics data.')
+          // Last resort: show the raw response message if available
+          const msg = result?.response?.message || result?.response?.result?.text || result?.response?.result?.message
+          setError(typeof msg === 'string' && msg.length > 10
+            ? 'Agent response: ' + msg.slice(0, 300)
+            : 'Unable to parse metrics from the agent response. Please try a different URL.')
         }
       } else {
         setError(result?.error || 'Analysis failed. Please try again.')
